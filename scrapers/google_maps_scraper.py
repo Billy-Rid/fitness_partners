@@ -159,7 +159,74 @@ async def _extract_detail(page, url: str, debug: bool = False) -> dict | None:
             print(f"    [debug] Error on {url}: {exc}")
         return None
 
+    # Email — scrape from the studio's own website
+    if biz.get("website"):
+        biz["email"] = await _extract_email_from_website(page, biz["website"], debug=debug)
+
     return biz
+
+
+_EMAIL_RE = re.compile(
+    r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}",
+)
+
+# Domains that are not real business emails (e.g. image CDNs, example domains)
+_EMAIL_BLACKLIST = {
+    "sentry.io", "example.com", "wix.com", "squarespace.com",
+    "wordpress.com", "shopify.com", "mailchimp.com", "googletagmanager.com",
+    "google.com", "apple.com", "schema.org", "w3.org",
+}
+
+
+def _is_valid_email(email: str) -> bool:
+    domain = email.split("@")[-1].lower()
+    if domain in _EMAIL_BLACKLIST:
+        return False
+    # Skip image/asset file extensions masquerading as emails
+    if re.search(r"\.(png|jpg|jpeg|gif|svg|webp|css|js)$", domain):
+        return False
+    return True
+
+
+async def _extract_email_from_website(
+    page, website_url: str, debug: bool = False
+) -> str:
+    """
+    Visit a business website and return the first valid contact email found.
+    Checks the homepage first, then tries /contact as a fallback.
+    """
+    urls_to_try = [website_url]
+
+    # Build a /contact fallback from the base domain
+    try:
+        from urllib.parse import urlparse
+        parsed = urlparse(website_url)
+        base = f"{parsed.scheme}://{parsed.netloc}"
+        contact_url = base.rstrip("/") + "/contact"
+        if contact_url != website_url:
+            urls_to_try.append(contact_url)
+    except Exception:
+        pass
+
+    for try_url in urls_to_try:
+        try:
+            await page.goto(try_url, wait_until="domcontentloaded", timeout=15000)
+            await asyncio.sleep(random.uniform(1.0, 2.0))
+            content = await page.content()
+            emails = _EMAIL_RE.findall(content)
+            valid = [e for e in emails if _is_valid_email(e)]
+            if valid:
+                # Prefer emails with "info", "contact", "hello", or "studio" in them
+                preferred = [
+                    e for e in valid
+                    if any(kw in e.lower() for kw in ("info", "contact", "hello", "studio", "gym"))
+                ]
+                return (preferred or valid)[0].lower()
+        except Exception as exc:
+            if debug:
+                print(f"    [debug] Email fetch error on {try_url}: {exc}")
+
+    return ""
 
 
 async def run_fitness_scraper(fetch_details: bool = True, debug: bool = False) -> list:

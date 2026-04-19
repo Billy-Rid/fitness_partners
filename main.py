@@ -28,6 +28,7 @@ OUTPUT_FILE = OUTPUT_DIR / "fitness_partners.csv"
 COLUMN_ORDER = [
     "name",
     "owner_names",
+    "email",
     "phone",
     "address",
     "category",

@@ -94,6 +94,14 @@ def build_pdf(csv_path: Path = INPUT_CSV, pdf_path: Path = OUTPUT_PDF) -> Path:
         leftIndent=10,
         spaceAfter=2,
     )
+    email_style = ParagraphStyle(
+        "Email",
+        parent=styles["Normal"],
+        fontSize=11,
+        textColor=colors.HexColor("#1a6b9a"),
+        leftIndent=10,
+        spaceAfter=2,
+    )
     meta_style = ParagraphStyle(
         "Meta",
         parent=styles["Normal"],
@@ -118,15 +126,18 @@ def build_pdf(csv_path: Path = INPUT_CSV, pdf_path: Path = OUTPUT_PDF) -> Path:
         name = _clean(row.get("name", "")) or "Unknown Studio"
         owner = _clean(row.get("owner_names", "")) or "Owner not found"
         phone = _clean(row.get("phone", "")) or "Phone not listed"
+        email = _clean(row.get("email", ""))
         address = _clean(row.get("address", ""))
         category = _clean(row.get("category", ""))
         website = _clean(row.get("website", ""))
         rating = _clean(row.get("rating", ""))
 
-        # Primary three lines — exactly as requested
+        # Primary lines
         story.append(Paragraph(name, studio_name_style))
         story.append(Paragraph(f"Owner: {owner}", owner_style))
         story.append(Paragraph(f"Phone: {phone}", phone_style))
+        if email:
+            story.append(Paragraph(f"Email: {email}", email_style))
 
         # Supporting info in smaller gray text
         if address:
